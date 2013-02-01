@@ -1,0 +1,161 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Highstock Example</title>
+<script type="text/javascript" src="http:///ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript" src="js/highstock.js"></script>
+<script type="text/javascript" src="js/modules/exporting.js"></script>
+<script type="text/javascript">
+
+(function($){ // encapsulate jQuery
+
+function getInterval(start, end) {
+   range = end - start;
+   
+   if(range < (6 * 3600000)) {
+     return 0;
+   }
+   if(range < (12 * 3600000)) {
+     return 30;
+   }
+   if(range < (24 * 3600000)) {
+     return 60;
+   }
+   if(range < (5 * 24 * 3600000)) {
+     return 300;
+   }
+   if(range < (14 * 24 * 3600000)) {
+     return 900;
+   }
+   if(range < (31 * 24 * 3600000)) {
+     return 1800;
+   }
+   if(range < (90 * 24 * 3600000)) {
+     return 10800;
+   }
+   if(range < (180 * 24 * 3600000)) {
+     return 21600;
+   }
+   if(range < (365 * 24 * 3600000)) {
+     return 43200;
+   }
+   return 86400; 
+}
+
+$(function() {
+    var start = new Date(2013,0,1,0,0,0,0);
+    var end = new Date();
+    var interval = getInterval(start,end);
+
+    $.getJSON('cosm2json.php?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream=CurrentTemperature', function(data) {
+
+	//data = [].concat(data, [[end, null]]);
+        // Create the chart
+        window.chart = new Highcharts.StockChart({
+            chart: {
+                renderTo: 'container',
+                type: 'spline',
+                zoomType: 'x'
+            },
+
+            title: {
+                text: 'Title Goes Here'
+            },
+
+            subtitle: {
+                text: 'Subtitle Goes Here'
+            },
+
+            rangeSelector: {
+              /*buttons: [{
+                type: 'ytd',
+                text: 'YTD'
+              },{
+                type: 'year',
+                count: 1,
+                text: '1y'
+              },{
+                type: 'month',
+                count: 3,
+                text: '3M'
+              },{
+                type: 'month',
+                count: 1,
+                text: '1M'
+              },{
+                type: 'week',
+                count: 1,
+                text: '1w'
+              },{ 
+                type: 'day',
+                count: 1,
+                text: '1d'
+              },{
+                type: 'hour',
+                count: 6,
+                text: '6h'
+              },{
+                type: 'hour',
+                count: 3,
+                text: '3h'
+              },{
+                type: 'hour',
+                count: 1,
+                text: '1h'
+              },{
+                type: 'minute',
+                count: 30,
+                text: '30m'
+              },{
+                type: 'minute',
+                count: 5,
+                text: '5m'
+              }], */
+              inputEnabled: false,
+              selected: 6 // all
+            },
+
+	/*
+            yAxis: {
+                labels: { 
+                    formatter: function() { return this.value + "°F"; }
+                }
+            },
+	*/
+            xAxis: {
+                events: {
+                    afterSetExtremes: loadNewRange 
+                }
+            }, 
+
+            series: [{
+                data: data,
+                dataGrouping: { enabled: false }
+           }]
+        });
+    });
+});
+
+
+function loadNewRange(e) {
+
+    var start, end, interval;
+    start = new Date(e.min);
+    end = new Date(e.max); 
+    interval = getInterval(start, end);
+    chart.showLoading('Loading data from server...');
+
+    $.getJSON('cosm2json.php?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream='+name, function(data) {
+        //data = [].concat([[new Date(2013,0,1,0,0,0,0),null]],data);
+        chart.series[0].setData(data);
+        chart.hideLoading();
+    });
+}
+
+})(jQuery);
+</script>
+</head>
+<body>
+<div id="container" style="height: 500px"></div>
+</body>    
