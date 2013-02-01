@@ -5,7 +5,6 @@
 <title>Highstock Example</title>
 <script type="text/javascript" src="http:///ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 <script type="text/javascript" src="js/highstock.js"></script>
-<script type="text/javascript" src="js/modules/exporting.js"></script>
 <script type="text/javascript">
 
 (function($){ // encapsulate jQuery
@@ -48,7 +47,7 @@ $(function() {
     var end = new Date();
     var interval = getInterval(start,end);
 
-    $.getJSON('cosm2json.php?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream=CurrentTemperature', function(data) {
+    $.getJSON('/data?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream=CurrentTemperature', function(data) {
 
 	//data = [].concat(data, [[end, null]]);
         // Create the chart
@@ -146,7 +145,7 @@ function loadNewRange(e) {
     interval = getInterval(start, end);
     chart.showLoading('Loading data from server...');
 
-    $.getJSON('cosm2json.php?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream='+name, function(data) {
+    $.getJSON('/data?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream='+name, function(data) {
         //data = [].concat([[new Date(2013,0,1,0,0,0,0),null]],data);
         chart.series[0].setData(data);
         chart.hideLoading();
