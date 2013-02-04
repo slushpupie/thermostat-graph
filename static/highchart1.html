@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title>Highstock Example</title>
 <script type="text/javascript" src="http:///ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
-<script type="text/javascript" src="js/highstock.js"></script>
+<script type="text/javascript" src="js/highcharts.js"></script>
 <script type="text/javascript">
 
 (function($){ // encapsulate jQuery
@@ -43,118 +43,305 @@ function getInterval(start, end) {
 }
 
 $(function() {
+
+     var masterChart,
+        detailChart;
+
     var start = new Date(2013,0,1,0,0,0,0);
+    var detailStart = new Date();
+    detailStart.setHours(detailStart.getHours()-24);
     var end = new Date();
-    var interval = getInterval(start,end);
-
-    $.getJSON('/data?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream=CurrentTemperature', function(data) {
-
-	//data = [].concat(data, [[end, null]]);
-        // Create the chart
-        window.chart = new Highcharts.StockChart({
-            chart: {
-                renderTo: 'container',
-                type: 'spline',
-                zoomType: 'x'
-            },
-
-            title: {
-                text: 'Title Goes Here'
-            },
-
-            subtitle: {
-                text: 'Subtitle Goes Here'
-            },
-
-            rangeSelector: {
-              /*buttons: [{
-                type: 'ytd',
-                text: 'YTD'
-              },{
-                type: 'year',
-                count: 1,
-                text: '1y'
-              },{
-                type: 'month',
-                count: 3,
-                text: '3M'
-              },{
-                type: 'month',
-                count: 1,
-                text: '1M'
-              },{
-                type: 'week',
-                count: 1,
-                text: '1w'
+    var masterStart = start;
+    var masterEnd = end;
+    var interval = getInterval(detailStart,end);
+    var datastreams = [{
+                id: 'OutsideTemp',
+                name: "Outside Temperature",
+                visible: true
               },{ 
-                type: 'day',
-                count: 1,
-                text: '1d'
-              },{
-                type: 'hour',
-                count: 6,
-                text: '6h'
-              },{
-                type: 'hour',
-                count: 3,
-                text: '3h'
-              },{
-                type: 'hour',
-                count: 1,
-                text: '1h'
-              },{
-                type: 'minute',
-                count: 30,
-                text: '30m'
-              },{
-                type: 'minute',
-                count: 5,
-                text: '5m'
-              }], */
-              inputEnabled: false,
-              selected: 6 // all
+                id: 'OutsideWindChill', 
+                name: 'Wind Chill',
+                visible: true
+              },{ 
+                id: 'OutsideHeatIndex', 
+                name: 'Heat Index',
+                visible: false
+              },{ 
+                id: 'CurrentTemperature', 
+                name: 'Inside Temperature',
+                visible: true
+              },{ 
+                id: 'CurrentSetpointHeat',
+                name: 'Setpoint (Heat)',
+                visible: true
+              },{ 
+                id: 'CurrentSetpointCool',
+                name: 'Setpoint (Cool)',
+                visible: false
+              },{ 
+                id: 'OutsideHumidity',
+                name: 'Outside Humidity',
+                visible: false
+              },{ 
+                id: 'TempDelta',
+                name: 'ΔInside- Outside',
+                visible: false
+              },{ 
+                id: 'TempDeltaH',
+                name: 'ΔInside-Setpoint (Heat)',
+                visible: false
+              },{ 
+                id: 'TempDeltaC',
+                name: 'ΔInside-Setpoint (Cool)',
+                visible: false
+              }];
+       
+    var navigatorSeries = 'OutsideTemp';
+    var navigatorData = [{name: 'Navigation', data: [[start,0],[end,100]]}];
+    var seriesCounter = 0;
+    var seriesTotal = 1;
+    var seriesOptions = [{name: 'Loading Data', data: [[start,0],[end,100]]}];
+
+    createMaster();
+    detailChart.showLoading("Loading data from server...");
+
+    seriesOptions = [];
+
+    $.each(datastreams, function(i, stream) {
+        stream.visible && seriesTotal++;
+    });
+
+    $.getJSON('/data?start='+start.toISOString()+'&end='+end.toISOString()+'&datastream='+navigatorSeries+'&limit=1000&interval='+getInterval(start,end), function(data) {
+        navigatorData = data;
+        seriesCounter++;
+        if(seriesCounter == seriesTotal) {
+            createMaster();
+        }
+    });
+        
+
+    $.each(datastreams, function(i, stream) {
+        stream.visible && $.getJSON('/data?start='+detailStart.toISOString()+'&end='+end.toISOString()+'&datastream='+stream.id+'&limit=1000&interval='+interval, function(data) {
+            seriesOptions.push( {
+                name: stream.name,
+                data: data,
+                type: 'spline'
+            });
+
+            seriesCounter++;
+            if(seriesCounter == seriesTotal) {
+                createMaster();
+            }
+       });
+    });
+
+    function createMaster() { 
+        masterChart = new Highcharts.Chart({
+            chart: {
+                renderTo: 'master-container',
+                reflow: false,
+                borderWidth: 0,
+                marginLeft: 50,
+                marginRight: 20,
+                zoomType: 'x',
+                events: {
+                        selection: function(e) {
+                            e.preventDefault()
+                            if(e.xAxis) {
+                                loadNewRange(e.xAxis[0]);
+                            } else {
+                                loadNewRange({ min: start, max: end });
+                            }
+                        }
+                }
+            },
+            title: {
+                    text: null
+            },
+            xAxis: {
+                    type: 'datetime',
+                    showLastTickLabel: true,
+                    plotBands: [{
+                        id: 'mask-before',
+                        from: start,
+                        to: detailStart,
+                        color: 'rgba(0, 0, 0, 0.2)'
+                    }],
+                    title: {
+                        text: null
+                    }
+            },
+            yAxis: {
+                    gridLineWidth: 0,
+                    labels: {
+                        enabled: false
+                    },
+                    title: {
+                        text: null
+                    },
+                    min: 0.6,
+                    showFirstLabel: false
+            },
+            tooltip: {
+                    formatter: function() {
+                        return false;
+                    }
+            },
+            legend: {
+                    enabled: false
+            },
+            credits: {
+                    enabled: false
+            },
+            plotOptions: {
+                    series: {
+                        fillColor: {
+                            linearGradient: [0, 0, 0, 70],
+                            stops: [
+                                [0, '#4572A7'],
+                                [1, 'rgba(0,0,0,0)']
+                            ]
+                        },
+                        lineWidth: 1,
+                        marker: {
+                            enabled: false
+                        },
+                        shadow: false,
+                        states: {
+                            hover: {
+                                lineWidth: 1
+                            }
+                        },
+                        enableMouseTracking: false
+                    }
+            },
+   
+ 
+            series: [{
+                    type: 'area',
+                    name: 'Navigator',
+                    //pointInterval: 24 * 3600 * 1000,
+                    pointStart: start,
+                    data: navigatorData
+            }],
+    
+            exporting: {
+                    enabled: false
+            }
+    
+        }, function(masterChart) {
+                createDetail(masterChart)
+        });
+    }
+
+   
+    function createDetail() {
+        
+        // Create the chart
+        detailChart = new Highcharts.Chart({
+            chart: {
+                renderTo: 'detail-container',
+                reflow: false,
+                type: 'spline',
+                zoomType: 'x',
+                events: {
+                     selection: function(e) {
+                                e.preventDefault();
+                                console.log(e); 
+                                if(e.xAxis) {
+                              	    loadNewRange(e.xAxis[0]);
+                                }
+                             }
+                }
+            },
+            
+            title: {
+                text: 'Thermostat Temperature Data'
             },
 
-	/*
+            xAxis: {
+                 type: 'datetime',
+                 min: detailStart,
+                 max: end
+                 
+            },
+
             yAxis: {
                 labels: { 
                     formatter: function() { return this.value + "°F"; }
-                }
+                },
+                title: 'Temperature'
             },
-	*/
-            xAxis: {
-                events: {
-                    afterSetExtremes: loadNewRange 
-                }
-            }, 
 
-            series: [{
-                data: data,
-                dataGrouping: { enabled: false }
-           }]
+            plotOptions: {
+                spline: {
+                  lineWidth: 2,
+                  states: {
+                     hover: {
+                       lineWidth: 3
+                     }
+                  },
+                  marker: {
+                     enabled: false,
+                     states: {
+                       enabled: true,
+                       symbol: 'circle',
+                       radius: 5,
+                       lineWidth: 1
+                     }
+                  }
+               }
+            },	
+            series: seriesOptions
+
         });
-    });
+    }
+
+    function loadNewRange(e) {
+        console.log(e)
+        var seriesCounter = 0;
+        masterStart = new Date(e.min);
+        masterEnd = new Date(e.max); 
+        var interval = getInterval(masterStart, masterEnd);
+        detailChart.showLoading('Loading data from server...');
+
+        $.each(detailChart.series, function(i, index) {
+                $.each(datastreams, function(j,stream) {
+                    (stream.name == detailChart.series[i].name) && $.getJSON('/data?start='+masterStart.toISOString()+'&end='+masterEnd.toISOString()+'&limit=1000&interval='+interval+'&datastream='+stream.id, function(data) {
+                        detailChart.series[i].setData(data);
+                        seriesCounter++;
+                        if(seriesCounter == detailChart.series.length) {
+                            detailChart.xAxis[0].setExtremes(masterStart, masterEnd);
+    
+                            // move the plot bands to reflect the new detail span
+                            masterChart.xAxis[0].removePlotBand('mask-before');
+                            masterChart.xAxis[0].addPlotBand({
+                                id: 'mask-before',
+                                from: start,
+                                to: masterStart,
+                                color: 'rgba(0, 0, 0, 0.2)'
+                            });
+    
+                            masterChart.xAxis[0].removePlotBand('mask-after');
+                            masterChart.xAxis[0].addPlotBand({
+                                id: 'mask-after',
+                                from: masterEnd,
+                                to: end,
+                                color: 'rgba(0, 0, 0, 0.2)'
+                            });
+    
+                            detailChart.hideLoading();
+                        } 
+                    });
+                });
+        });
+    }
 });
-
-
-function loadNewRange(e) {
-
-    var start, end, interval;
-    start = new Date(e.min);
-    end = new Date(e.max); 
-    interval = getInterval(start, end);
-    chart.showLoading('Loading data from server...');
-
-    $.getJSON('/data?start='+start.toISOString()+'&end='+end.toISOString()+'&limit=1000&interval='+interval+'&datastream='+name, function(data) {
-        //data = [].concat([[new Date(2013,0,1,0,0,0,0),null]],data);
-        chart.series[0].setData(data);
-        chart.hideLoading();
-    });
-}
 
 })(jQuery);
 </script>
 </head>
 <body>
-<div id="container" style="height: 500px"></div>
+<div id="detail-container" style="height: 700px"></div>
+<div id="master-container" style="height: 70px"></div>
 </body>    
