@@ -14,12 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import logging
 import webapp2
 import cgi
 import csv
 import json
 import iso8601
+import hashlib
 from urllib2 import Request, urlopen, HTTPError, URLError, HTTPHandler, build_opener
+from google.appengine.api import memcache
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
@@ -37,7 +40,13 @@ class MainHandler(webapp2.RequestHandler):
         for arg in allowed_args:
             if self.request.get(arg) <> "":
                 url = url + '&' + arg + '=' + self.request.get(arg)
-      
+     
+        data = memcache.get(hashlib.sha1(url).hexdigest())
+        if data != None:
+            self.response.headers['Content-Type'] = 'application/json'
+            self.response.write(json.dumps(data))
+            return
+        
         data = []
         try: 
             opener = build_opener(HTTPHandler)
@@ -54,10 +63,15 @@ class MainHandler(webapp2.RequestHandler):
                    data.append(L) 
         except HTTPError as e:
            data.append(["HTTPError",e.code, e.read()])
+           logging.error("Failure to fetch"+url)
         except URLError as e:
            data.append(["URLError",e.reason])
+           logging.error("Failure to fetch"+url)
         except Exception as e:
            data.append(["Error",e.args])
+           logging.error("Failure to fetch"+url)
+
+        memcache.set(hashlib.sha1(url).hexdigest(),data,time=300)
 
         self.response.headers['Content-Type'] = 'application/json'
         self.response.write(json.dumps(data))
